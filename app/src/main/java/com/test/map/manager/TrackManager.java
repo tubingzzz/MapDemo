@@ -41,11 +41,11 @@ public class TrackManager implements TraceStatusListener {
         LBSTraceClient.getInstance(context).stopTrace();
     }
 
-    public void setTraceLitener(TraceStatusListener traceLitener) {
+    public void setTraceListener(TraceStatusListener traceLitener) {
         mTraceLitener=traceLitener;
     }
 
-    public void removeTraceLitener() {
+    public void removeTraceListener() {
         mTraceLitener=null;
     }
 

@@ -30,11 +30,14 @@ public interface MainContract {
     }
 
     interface Presenter {
+        void init();
         void goToNavi();
         void goToRouteDetail();
 
         void getRoutPlan();
 
         void onActivityResult(int requestCode, int resultCode, @Nullable Intent data);
+
+        void onDestroy();
     }
 }

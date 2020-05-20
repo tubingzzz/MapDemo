@@ -1,14 +1,22 @@
 package com.test.map.presenter;
 
+import android.annotation.SuppressLint;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.location.Location;
 import android.util.Log;
-import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import com.amap.api.location.AMapLocation;
+import com.amap.api.location.AMapLocationClient;
+import com.amap.api.location.AMapLocationClientOption;
+import com.amap.api.location.AMapLocationListener;
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.AMapOptions;
 import com.amap.api.maps.UiSettings;
@@ -34,6 +42,7 @@ import com.amap.api.trace.TraceLocation;
 import com.amap.api.trace.TraceOverlay;
 import com.amap.api.trace.TraceStatusListener;
 import com.test.map.MainActivity;
+import com.test.map.MyApplication;
 import com.test.map.R;
 import com.test.map.base.MainContract;
 import com.test.map.manager.TrackManager;
@@ -46,10 +55,11 @@ import com.test.map.utills.ToastUtil;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickListener, AMap.OnPOIClickListener, AMap.OnMyLocationChangeListener, TraceStatusListener, GeocodeSearch.OnGeocodeSearchListener, RouteSearch.OnRouteSearchListener {
+public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickListener, AMap.OnPOIClickListener, AMap.OnMyLocationChangeListener, TraceStatusListener, GeocodeSearch.OnGeocodeSearchListener, RouteSearch.OnRouteSearchListener, AMapLocationListener {
 
     private static final String TAG = "MainPresenter";
     private static final int REQUEST_CODE = 1000;
+    private static final int NOTIFICATION_SERVICE_ID = 2001;
     private final MainContract.View mView;
 
     private final MainActivity mContext;
@@ -64,12 +74,19 @@ public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickLis
     private RideRouteResult mRideRouteResult;
     private RidePath mRidePath;
 
+    //声明AMapLocationClient类对象
+    public AMapLocationClient mLocationClient = null;
+    private static final String NOTIFICATION_CHANNEL_NAME = "BackgroundLocation";
+    private NotificationManager notificationManager = null;
+    boolean isCreateChannel = false;
+
+
     public MainPresenter(MainContract.View view) {
         mView=view;
         mContext = (MainActivity) view;
-        initAmap();
     }
-    private void initAmap() {
+    @Override
+    public void init() {
         mAMap = mView.getAMap();
         MyLocationStyle myLocationStyle = new MyLocationStyle();//初始化定位蓝点样式类myLocationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE);//连续定位、且将视角移动到地图中心点，定位点依照设备方向旋转，并且会跟随设备移动。（1秒1次定位）如果不设置myLocationType，默认也会执行此种模式。
         myLocationStyle.interval(2000); //设置连续定位模式下的定位间隔，只在连续定位模式下生效，单次定位模式下不会生效。单位为毫秒。
@@ -87,7 +104,7 @@ public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickLis
         mAMap.setOnMapClickListener(this);
         mAMap.setOnPOIClickListener(this);
         mAMap.setOnMyLocationChangeListener(this);
-        TrackManager.getInstance().setTraceLitener(this);
+        TrackManager.getInstance().setTraceListener(this);
 
         //经纬度转换为地址
         mGeocodeSearch = new GeocodeSearch((Context) mView);
@@ -96,6 +113,73 @@ public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickLis
         mRouteSearch = new RouteSearch((Context) mView);
         mRouteSearch.setRouteSearchListener(this);
 
+    }
+
+
+  public void  initLocationClien() {
+        //初始化定位
+       mLocationClient = new AMapLocationClient(MyApplication.getApplication());
+     //设置定位回调监听
+       mLocationClient.setLocationListener(this);
+      //启动后台定位，第一个参数为通知栏ID，建议整个APP使用一个
+      mLocationClient.enableBackgroundLocation(NOTIFICATION_SERVICE_ID, buildNotification());
+      AMapLocationClientOption option = new AMapLocationClientOption();
+       option.setInterval(3000);
+       option.setHttpTimeOut(20000);
+
+      //设置定位场景，目前支持三种场景（签到、出行、运动，默认无场景）
+       option.setLocationPurpose(AMapLocationClientOption.AMapLocationPurpose.Transport);
+       if(null != mLocationClient){
+           mLocationClient.setLocationOption(option);
+           //设置场景模式后最好调用一次stop，再调用start以保证场景模式生效
+           mLocationClient.stopLocation();
+           mLocationClient.startLocation();
+       }
+   }
+
+    private void stopinitLocation() {
+        if (mLocationClient != null) {
+            mLocationClient.disableBackgroundLocation(true);
+            mLocationClient.stopLocation();
+            mLocationClient.onDestroy();
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private Notification buildNotification() {
+
+        Notification.Builder builder = null;
+        Notification notification = null;
+        if(android.os.Build.VERSION.SDK_INT >= 26) {
+            //Android O上对Notification进行了修改，如果设置的targetSDKVersion>=26建议使用此种方式创建通知栏
+            if (null == notificationManager) {
+                notificationManager = (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            }
+            String channelId = mContext.getPackageName();
+            if(!isCreateChannel) {
+                NotificationChannel notificationChannel = new NotificationChannel(channelId,
+                        NOTIFICATION_CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT);
+                notificationChannel.enableLights(true);//是否在桌面icon右上角展示小圆点
+                notificationChannel.setLightColor(Color.BLUE); //小圆点颜色
+                notificationChannel.setShowBadge(true); //是否在久按桌面图标时显示此渠道的通知
+                notificationManager.createNotificationChannel(notificationChannel);
+                isCreateChannel = true;
+            }
+            builder = new Notification.Builder(MyApplication.getApplication(), channelId);
+        } else {
+            builder = new Notification.Builder(MyApplication.getApplication());
+        }
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle("'导航'")
+                .setContentText("正在后台运行")
+                .setWhen(System.currentTimeMillis());
+
+        if (android.os.Build.VERSION.SDK_INT >= 16) {
+            notification = builder.build();
+        } else {
+            return builder.getNotification();
+        }
+        return notification;
     }
 
 
@@ -138,6 +222,11 @@ public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickLis
         }
     }
 
+    @Override
+    public void onDestroy() {
+//        stopinitLocation();
+    }
+
     /** ************************  点击地图  *******************************/
     @Override
     public void onMapClick(LatLng latLng) {
@@ -168,6 +257,12 @@ public class MainPresenter implements MainContract.Presenter, AMap.OnMapClickLis
     public void onMyLocationChange(Location location) {
         Log.d(TAG, "onMyLocationChange: location == "+location.toString());
         mLocation = location;
+    }
+
+
+    @Override
+    public void onLocationChanged(AMapLocation aMapLocation) {
+
     }
 
     @Override

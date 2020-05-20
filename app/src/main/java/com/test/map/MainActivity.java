@@ -4,57 +4,28 @@ import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.app.ProgressDialog;
 import android.content.Intent;
-import android.location.Location;
 import android.os.Bundle;
 
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.MapView;
-import com.amap.api.maps.model.LatLng;
-import com.amap.api.maps.model.Marker;
-import com.amap.api.maps.model.Poi;
 
-import com.amap.api.navi.model.NaviLatLng;
-import com.amap.api.services.core.AMapException;
-import com.amap.api.services.core.LatLonPoint;
-import com.amap.api.services.geocoder.GeocodeResult;
-import com.amap.api.services.geocoder.GeocodeSearch;
-import com.amap.api.services.geocoder.RegeocodeQuery;
-import com.amap.api.services.geocoder.RegeocodeResult;
-import com.amap.api.services.route.BusRouteResult;
-import com.amap.api.services.route.DriveRouteResult;
-import com.amap.api.services.route.RidePath;
-import com.amap.api.services.route.RideRouteResult;
-import com.amap.api.services.route.RouteSearch;
-import com.amap.api.services.route.WalkRouteResult;
-import com.amap.api.trace.TraceLocation;
-import com.amap.api.trace.TraceOverlay;
-import com.amap.api.trace.TraceStatusListener;
 import com.test.map.base.MainContract;
 import com.test.map.callback.AnimatorIml;
-import com.test.map.overlay.RideRouteOverlay;
 import com.test.map.manager.TrackManager;
 import com.test.map.presenter.MainPresenter;
-import com.test.map.ui.RideRouteCalculateActivity;
-import com.test.map.ui.RideRouteDetailActivity;
-import com.test.map.utills.AMapUtil;
-import com.test.map.utills.ToastUtil;
+import com.test.map.ui.CheckPermissionsActivity;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 
-import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
-import android.widget.Toast;
-
-import java.util.List;
 
 /**
  * @author tu
  */
-public class MainActivity extends AppCompatActivity implements View.OnClickListener  , MainContract.View{
+public class MainActivity  extends CheckPermissionsActivity implements View.OnClickListener  , MainContract.View{
     private static final String TAG = "MainActivity";
     private static final int REQUEST_CODE = 100;
     private MapView mMapView;
@@ -75,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
         initView(savedInstanceState);
         mMainPresenter = new MainPresenter(this);
+        mMainPresenter.init();
     }
 
     private void initView(Bundle savedInstanceState) {
@@ -143,7 +115,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onDestroy();
         //在activity执行onDestroy时执行mMapView.onDestroy()，销毁地图
         mMapView.onDestroy();
-        TrackManager.getInstance().removeTraceLitener();
+        TrackManager.getInstance().removeTraceListener();
     }
 
     @Override
